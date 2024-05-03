@@ -2,14 +2,30 @@
 
 pragma solidity ^0.8.19;
 
+<<<<<<< HEAD
+import "./IMultisigWallet.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+
+contract MultisigWallet is IMultiSigWallet{
+=======
 contract MultisigWallet {
+>>>>>>> main
     address owner;
     mapping(address => bool) private signers;
     uint8 signersCount = 0;
 
+<<<<<<< HEAD
+    mapping(uint trxid => uint approvals) private trxApprovals;
+
     event SignerCreated(address Signer, uint8 signersCount);
     event SignerChanged(address _oldSigner, address _newSigner, uint8 signersCount);
     event SignerRemoved(address Signer, uint8 signersCount);
+    event TransactionSigned(uint trxid, address signer);
+=======
+    event SignerCreated(address Signer, uint8 signersCount);
+    event SignerChanged(address _oldSigner, address _newSigner, uint8 signersCount);
+    event SignerRemoved(address Signer, uint8 signersCount);
+>>>>>>> main
 
 
     constructor(address _owner){
@@ -64,4 +80,37 @@ contract MultisigWallet {
 
         return true;
     }
+<<<<<<< HEAD
+
+
+
+    // erc20 transaction functions
+
+    // erc20 modifiers
+
+    // erc20 functions
+    function transferERC20(address token, address to, uint256 amount) external returns (bool){        
+        require(amount >= 0, "Invalid amount");
+        require(IERC20(token).transfer(to, amount), "Transfer failed");
+    }
+
+    function approveTransaction(uint256 transactionId) external returns (bool){
+        // check if already approved
+        if(trxApprovals[transactionId] >= 3){
+            
+        }
+
+        else{
+            trxApprovals[transactionId] ++;
+
+            emit TransactionSigned(transactionId, msg.sender);
+            return true;
+        }
+    }
+
+    function executeTransaction(uint256 transactionId) external returns (bool){
+
+    }
+=======
+>>>>>>> main
 }
