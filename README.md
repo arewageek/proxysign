@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Multi Signature Smart Contract
 
 The Multi Signature Smart Contract project is a decentralized solution for implementing multi-signature wallets on the Ethereum blockchain. It utilizes Solidity for smart contract development, Hardhat for development environment, testing, and deployment, and leverages an ERC20 Contract interface provided by @openzeppelin.
@@ -60,4 +59,3 @@ REPORT_GAS=true npx hardhat test
 npx hardhat node
 npx hardhat run scripts/deploy.ts
 ```
->>>>>>> main
