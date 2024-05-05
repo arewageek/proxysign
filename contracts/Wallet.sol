@@ -4,47 +4,20 @@ pragma solidity ^0.8.19;
 
 import "./IMultisigWallet.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "./Modifiers.sol";
+import "./GlobalData.sol";
 
-contract MultisigWallet is IMultiSigWallet{
-    address owner;
-    mapping(address => bool) private signers;
-    uint8 signersCount = 0;
-
-    mapping(uint trxid => uint approvals) private trxApprovals;
-
-    event SignerCreated(address Signer, uint8 signersCount);
-    event SignerChanged(address _oldSigner, address _newSigner, uint8 signersCount);
-    event SignerRemoved(address Signer, uint8 signersCount);
-    event TransactionSigned(uint trxid, address signer);
-
-
+contract MultisigWallet is IMultiSigWallet, GlobalData, Modifiers{
     constructor(address _owner){
         owner = _owner;
     }
 
-    modifier OnlyOwner() {
-        require(msg.sender == owner, "Unauthorized");
-        _;
-    }
-    
-    modifier SignerExist (address _signer) {
-        require(!signers[_signer], "Duplicate Entry");
-        _;
-    }
-
-    modifier SignerNotExist (address _signer){
-        require(signers[_signer], "Signer Not Exist");
-        _;
-    }
-    
     function CreateSigner(address _signer) public OnlyOwner SignerExist(_signer) returns(bool){
         require(signersCount <= 3, "Max Signers Reached");
-        
         signers[_signer] = true;
         signersCount ++;
 
         emit SignerCreated(_signer, signersCount);
-        
         return true;
     }
 
@@ -75,29 +48,40 @@ contract MultisigWallet is IMultiSigWallet{
 
     // erc20 transaction functions
 
-    // erc20 modifiers
-
-    // erc20 functions
-    function transferERC20(address token, address to, uint256 amount) external returns (bool){        
+    function transferERC20(address token, address to, uint256 amount) external override returns (bool){
         require(amount >= 0, "Invalid amount");
-        require(IERC20(token).transfer(to, amount), "Transfer failed");
+
+        IERC20 erc20token = IERC20(token);
+
+        require(erc20token.transfer(to, amount), "Transaction failed");
+
+        emit Withdrawal(to, amount);
+
+        return true;
     }
 
     function approveTransaction(uint256 transactionId) external returns (bool){
         // check if already approved
-        if(trxApprovals[transactionId] >= 3){
-            
-        }
+        require(transactions[transactionId].signers.length <= 3, "Max approvals reached");
 
-        else{
-            trxApprovals[transactionId] ++;
+        emit TransactionSigned(transactionId, msg.sender);
 
-            emit TransactionSigned(transactionId, msg.sender);
-            return true;
+        if(transactions[transactionId].signers.length == 3){
+            transactions[transactionId].exceeded = true;
+            emit TransactionApproved(transactionId);
         }
+        
+        return true;
     }
 
     function executeTransaction(uint256 transactionId) external returns (bool){
+        require(transactions[transactionId].signers.length >= 3, "Not enough signers");
+        emit TransactionExecuted(transactionId);
 
+        return true;
+    }
+
+    receive() external payable {
+        emit Deposit(msg.sender, msg.value);
     }
 }
