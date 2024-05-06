@@ -2,86 +2,115 @@
 
 pragma solidity ^0.8.19;
 
-import "./IMultisigWallet.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./Modifiers.sol";
 import "./GlobalData.sol";
 
-contract MultisigWallet is IMultiSigWallet, GlobalData, Modifiers{
-    constructor(address _owner){
+contract MultisigWallet is GlobalData, Modifiers{
+    
+    constructor(address _owner, uint8 _maxSignersCount, uint8 _requiredApprovals, address[] memory _signers){
         owner = _owner;
+        maxSignersCount = _maxSignersCount;
+        requiredApprovals = _requiredApprovals;
+
+        require(signers.length > 0 && signers.length <= requiredApprovals, "Invalid number of signers");
+        
+        bool signerFound;
+        for(uint8 i = 0; i < _signers.length; i++){
+            // prevent use of dead or origin address
+            require(_signers[i] != address(0) , "Invalid address");
+            
+            signers.push(_signers[i]);
+        }
+
     }
 
-    function CreateSigner(address _signer) public OnlyOwner SignerExist(_signer) returns(bool){
-        require(signersCount <= 3, "Max Signers Reached");
-        signers[_signer] = true;
-        signersCount ++;
-
-        emit SignerCreated(_signer, signersCount);
+    function CreateSigner(address _signer) public OnlyOwner SignerNotExist(_signer) returns(bool){
+        signers.push(_signer);
+        emit SignerCreated(_signer, signers.length);
         return true;
     }
 
-    function changeSigner (address _newSigner, address _oldSigner) public OnlyOwner SignerExist(_newSigner) returns (bool){
+    function changeSigner (address _newSigner, address _oldSigner) public OnlyOwner returns (bool){
 
         require(signers[_oldSigner], "Signer Not Exist");
-        require(signersCount <= 0, "Minimum Signers Reached");
 
         delete signers[_oldSigner];
         signers[_newSigner] = true;
-        signersCount --;
 
-        emit SignerChanged(_oldSigner, _newSigner, signersCount);
+        emit SignerChanged(_oldSigner, _newSigner, signers.length);
 
         return true;
     }
     
     function removeSigner (address _oldSigner) public OnlyOwner() SignerNotExist(_oldSigner) returns (bool){
         delete signers[_oldSigner];
-        signersCount --;
 
-        emit SignerRemoved(_oldSigner, signersCount);
-
-        return true;
-    }
-
-
-
-    // erc20 transaction functions
-
-    function transferERC20(address token, address to, uint256 amount) external override returns (bool){
-        require(amount >= 0, "Invalid amount");
-
-        IERC20 erc20token = IERC20(token);
-
-        require(erc20token.transfer(to, amount), "Transaction failed");
-
-        emit Withdrawal(to, amount);
+        emit SignerRemoved(_oldSigner, signers.length);
 
         return true;
     }
 
-    function approveTransaction(uint256 transactionId) external returns (bool){
-        // check if already approved
-        require(transactions[transactionId].signers.length <= 3, "Max approvals reached");
+    function setRequiredApprovals(uint8 newRequiredApprovals) public OnlyOwner() {
+        requiredApprovals = newRequiredApprovals;
+    }
+    
+    function approve(uint256 trxId) external OnlyOwner TransactionExecuted(trxId) NotApproved(trxId) NotExecuted(trxId) returns (bool){
+        approved[trxId][msg.sender] = true;
 
-        emit TransactionSigned(transactionId, msg.sender);
+        emit Approved (msg.sender, trxId);
+    }
 
-        if(transactions[transactionId].signers.length == 3){
-            transactions[transactionId].exceeded = true;
-            emit TransactionApproved(transactionId);
+    function _getApprovalCount(uint256 trxId) private view returns(uint count){
+        for(uint i=0; i<signers.length; i++){
+            if(approved[trxId][signers[i]]){
+                count++;
+            }
         }
-        
-        return true;
     }
 
-    function executeTransaction(uint256 transactionId) external returns (bool){
-        require(transactions[transactionId].signers.length >= 3, "Not enough signers");
-        emit TransactionExecuted(transactionId);
+    function execute(uint256 trxId) external TrxExist(trxId) NotExecuted(trxId){
+        require(_getApprovalCount(trxId) >= requiredApprovals, "Approvals below requirement");
+        Transaction storage transaction = transactions[trxId];
 
-        return true;
+        transaction.executed = true;
+
+        ( bool success ) = transaction.to.call{ value: transaction.value}(
+            transaction.data
+        );
+
+        require(success, "Trx faied");
+
+        emit Executed(trxId);
     }
 
     receive() external payable {
         emit Deposit(msg.sender, msg.value);
+    }
+
+    function getTokenBalance(address _token) external view returns(uint){
+        IERC20 token = IERC20(_token);
+        
+        uint balance = token.balanceOf(msg.sender);
+
+        return balance;
+    }
+
+    function submit(address _to, uint value, bytes calldata _data) external OnlyOwner{
+        transactions[transactions.length] = Transaction({
+            to: _to,
+            amount: value,
+            data: _data,
+            exceeded: false
+        });
+
+        emit Submit(transactions.length - 1);
+    }
+
+    function revoke(uint256 trxId) external OnlyOwner TrxExist(trxId) NotExecuted(trxId){
+        require(approved[trxId][msg.sender], "trx not approved");
+        approved[trxId][msg.sender] = false;
+
+        emit Revoke(trxId);
     }
 }
