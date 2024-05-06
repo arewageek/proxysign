@@ -82,7 +82,7 @@ contract MultisigWallet is GlobalData, Modifiers{
 
         require(success, "Trx faied");
 
-        emit executed(trxId);
+        emit Executed(trxId);
     }
 
     receive() external payable {
