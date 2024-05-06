@@ -12,26 +12,33 @@ contract Modifiers is GlobalData {
     }
 
     // signers validation modifiers
-    modifier SignerExist (address _signer) {
-        require(!signers[_signer], "Duplicate Entry");
-        _;
-    }
-
-    modifier SignerNotExist (address _signer){
-        require(signers[_signer], "Signer Not Exist");
+    modifier SignerNotExist (address _signer) {
+        bool signerFound;
+        for(uint256 i; i < signers.length; i++){
+            if(signers[i] == _signer){
+                signerFound = true;
+            }
+        }
+        
+        require(!signerFound, "Signer Exists");
         _;
     }
 
 
     // transaction modifiers
 
-    modifier TransactionExist (uint256 trxId){
-        require(trxId < nextTrxId, "Transaction Exist");
+    modifier TrxExist (uint256 trxId){
+        require(trxId < transactions.length, "Trx Does Not Exist");
         _;
     }
 
-    modifier NotExceeded (uint256 trxId){
-        require(!transactions[trxId].exceeded, "Transaction Already Executed");
+    modifier NotApproved (uint256 trxId){
+        require(!approved[trxId][msg.sender], "Trx Already Approved");
+        _;
+    }
+
+    modifier NotExecuted (uint256 trxId){
+        require(!transactions[trxId].executed, "Trx Already Executed");
         _;
     }
 }
