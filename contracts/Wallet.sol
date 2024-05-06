@@ -15,9 +15,8 @@ contract MultisigWallet is GlobalData, Modifiers{
 
         require(signers.length > 0 && signers.length <= requiredApprovals, "Invalid number of signers");
         
+        bool signerFound;
         for(uint8 i = 0; i < _signers.length; i++){
-            // prevent duplicate entries
-            require(!signers[_signers[i]], "Signer already exists");
             // prevent use of dead or origin address
             require(_signers[i] != address(0) , "Invalid address");
             
